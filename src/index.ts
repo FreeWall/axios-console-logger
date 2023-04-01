@@ -1,5 +1,6 @@
 import axios, {
   AxiosError,
+  AxiosRequestConfig,
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from 'axios';
@@ -14,7 +15,10 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   };
 }
 
-const defaultOptions: AxiosConsoleLoggerOptions = {
+type RequestKey = keyof AxiosRequestConfig;
+type ResponseKey = keyof AxiosResponse;
+
+const defaultOptions: Required<AxiosConsoleLoggerOptions> = {
   colors: {
     get: {
       request: '#54b7d3',
@@ -25,8 +29,11 @@ const defaultOptions: AxiosConsoleLoggerOptions = {
       response: '#6f943b',
     },
   },
-  timings: true,
-  sizes: true,
+  multiline: false,
+  responseSize: true,
+  responseTime: true,
+  requestKeys: ['params', 'data'],
+  responseKeys: ['data'],
 };
 
 interface AxiosConsoleLoggerOptions {
@@ -40,13 +47,16 @@ interface AxiosConsoleLoggerOptions {
       response: string;
     };
   };
-  timings?: boolean;
-  sizes?: boolean;
+  responseSize?: boolean;
+  responseTime?: boolean;
+  multiline?: boolean;
+  requestKeys?: RequestKey[];
+  responseKeys?: ResponseKey[];
 }
 
 export class AxiosConsoleLogger {
   private logId = 0;
-  private options: AxiosConsoleLoggerOptions;
+  private options: Required<AxiosConsoleLoggerOptions>;
 
   constructor(options?: AxiosConsoleLoggerOptions) {
     this.options = {
@@ -54,8 +64,11 @@ export class AxiosConsoleLogger {
         get: options?.colors?.get ?? defaultOptions?.colors?.get,
         post: options?.colors?.post ?? defaultOptions?.colors?.post,
       },
-      timings: options?.timings ?? defaultOptions.timings,
-      sizes: options?.sizes ?? defaultOptions.sizes,
+      responseSize: options?.responseSize ?? defaultOptions.responseSize,
+      responseTime: options?.responseTime ?? defaultOptions.responseTime,
+      multiline: options?.multiline ?? defaultOptions.multiline,
+      requestKeys: options?.requestKeys ?? defaultOptions.requestKeys,
+      responseKeys: options?.responseKeys ?? defaultOptions.responseKeys,
     };
   }
 
@@ -69,7 +82,7 @@ export class AxiosConsoleLogger {
     request.__consoleLogger = {
       uri: axios.getUri(request),
       operationId,
-      startTime: this.options.timings ? Date.now() : 0,
+      startTime: this.options.responseTime ? Date.now() : 0,
     };
 
     return request;
@@ -89,6 +102,14 @@ export class AxiosConsoleLogger {
     operation: InternalAxiosRequestConfig,
     operationId: number,
   ) {
+    const result: Partial<Record<RequestKey, any>> = {};
+
+    this.options.requestKeys?.map((key) => {
+      if (!isEmpty(operation[key])) {
+        result[key] = operation[key];
+      }
+    });
+
     console.debug(
       '%c >> ' +
         operation.method?.toUpperCase() +
@@ -96,7 +117,8 @@ export class AxiosConsoleLogger {
         operationId +
         ' %c %c' +
         axios.getUri(operation) +
-        '%c',
+        '%c' +
+        (this.options.multiline ? '\n' : ''),
       'background: ' +
         (operation.method && operation.method in (defaultOptions.colors ?? [])
           ? this.options.colors?.[operation.method as typeof methods[number]]
@@ -106,15 +128,11 @@ export class AxiosConsoleLogger {
       undefined,
       'color: inherit; font-weight: bold;',
       undefined,
-      {
-        ...(isEmpty(operation.params) ? null : { params: operation.params }),
-        ...(isEmpty(operation.data) ? null : { data: operation.data }),
-      },
+      result,
     );
   }
 
   protected _logResponse(operation: AxiosResponse, error?: AxiosError) {
-    const success = !error;
     const consoleLogger = (operation.config as CustomAxiosRequestConfig)
       .__consoleLogger;
 
@@ -122,19 +140,23 @@ export class AxiosConsoleLogger {
       return;
     }
 
+    const result: Partial<Record<ResponseKey, any>> = {};
+
+    this.options.responseKeys?.map((key) => {
+      if (!isEmpty(operation[key])) {
+        result[key] = operation[key];
+      }
+    });
+
     console.debug(
       '%c << ' +
         operation.config.method?.toUpperCase() +
         ' #' +
         consoleLogger.operationId +
         ' %c ' +
-        (!success ? '⚠️ ' : '') +
+        (error ? '⚠️ ' : '') +
         `%c${consoleLogger.uri}%c` +
-        (this.options.timings
-          ? ` %c${Date.now() - consoleLogger.startTime} ms`
-          : '%c') +
-        '%c' +
-        (this.options.sizes
+        (this.options.responseSize
           ? ` %c${
               Math.round(
                 ((JSON.stringify(operation.data)?.length +
@@ -143,7 +165,13 @@ export class AxiosConsoleLogger {
                   10,
               ) / 10
             } kB`
-          : '%c'),
+          : '%c') +
+        '%c' +
+        (this.options.responseTime
+          ? ` %c${Date.now() - consoleLogger.startTime} ms`
+          : '%c') +
+        '%c' +
+        (this.options.multiline ? '\n' : ''),
       'background: ' +
         (operation.config.method &&
         operation.config.method in (defaultOptions.colors ?? [])
@@ -154,16 +182,17 @@ export class AxiosConsoleLogger {
         '; padding: 2px; color: #ffffff; border-radius: 3px;',
       undefined,
       'font-weight: bold;' +
-        (success ? 'color: #008000;' : 'background: #FFD6D6;'),
+        (!error ? 'color: #008000;' : 'background: #FFD6D6;'),
       undefined,
-      this.options.timings
+      this.options.responseSize
         ? 'background: #e4e4e4; padding: 2px 4px; border-radius: 3px; font-size: 11px;'
         : undefined,
       undefined,
-      this.options.sizes
+      this.options.responseTime
         ? 'background: #e4e4e4; padding: 2px 4px; border-radius: 3px; font-size: 11px;'
         : undefined,
-      operation.data,
+      undefined,
+      result,
     );
   }
 
@@ -187,5 +216,5 @@ function isEmpty(value: unknown) {
     return !Object.keys(value).length;
   }
 
-  return true;
+  return false;
 }
