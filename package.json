@@ -1,6 +1,6 @@
 {
   "name": "@freewall/axios-console-logger",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "author": "Michal Vaněk",
   "private": false,
@@ -32,6 +32,7 @@
     "axios-interceptor",
     "http",
     "logging",
-    "debug"
+    "debug",
+    "node"
   ]
 }

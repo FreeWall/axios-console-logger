@@ -47,9 +47,9 @@ interface AxiosConsoleLoggerOptions {
       response: string;
     };
   };
+  multiline?: boolean;
   responseSize?: boolean;
   responseTime?: boolean;
-  multiline?: boolean;
   requestKeys?: RequestKey[];
   responseKeys?: ResponseKey[];
 }
@@ -64,9 +64,9 @@ export class AxiosConsoleLogger {
         get: options?.colors?.get ?? defaultOptions?.colors?.get,
         post: options?.colors?.post ?? defaultOptions?.colors?.post,
       },
+      multiline: options?.multiline ?? defaultOptions.multiline,
       responseSize: options?.responseSize ?? defaultOptions.responseSize,
       responseTime: options?.responseTime ?? defaultOptions.responseTime,
-      multiline: options?.multiline ?? defaultOptions.multiline,
       requestKeys: options?.requestKeys ?? defaultOptions.requestKeys,
       responseKeys: options?.responseKeys ?? defaultOptions.responseKeys,
     };
